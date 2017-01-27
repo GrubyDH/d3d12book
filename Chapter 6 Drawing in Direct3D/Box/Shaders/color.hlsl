@@ -7,6 +7,10 @@
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorldViewProj;
+};
+
+cbuffer cbPerFrame : register(b1)
+{
     float gTime;
 };
 

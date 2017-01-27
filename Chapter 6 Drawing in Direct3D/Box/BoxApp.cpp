@@ -25,6 +25,10 @@ struct Vertex
 struct ObjectConstants
 {
     XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
+};
+
+struct FrameConstants
+{
     float Time;
 };
 
@@ -60,6 +64,7 @@ private:
     ComPtr<ID3D12DescriptorHeap> mCbvHeap = nullptr;
 
     std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB = nullptr;
+    std::unique_ptr<UploadBuffer<FrameConstants>> mFrameCB = nullptr;
 
 	std::unique_ptr<MeshGeometry> mBoxGeo = nullptr;
     std::unique_ptr<MeshGeometry> mPyramidGeo = nullptr;
@@ -171,8 +176,11 @@ void BoxApp::Update(const GameTimer& gt)
 	// Update the constant buffer with the latest worldViewProj matrix.
 	ObjectConstants objConstants;
     XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
-    objConstants.Time = gt.TotalTime();
     mObjectCB->CopyData(0, objConstants);
+
+    FrameConstants frameConstants;;
+    frameConstants.Time = gt.TotalTime();
+    mFrameCB->CopyData(0, frameConstants);
 }
 
 void BoxApp::Draw(const GameTimer& gt)
@@ -291,16 +299,20 @@ void BoxApp::OnMouseMove(WPARAM btnState, int x, int y)
 void BoxApp::BuildDescriptorHeaps()
 {
     D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
-    cbvHeapDesc.NumDescriptors = 1;
+    cbvHeapDesc.NumDescriptors = 2;
     cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	cbvHeapDesc.NodeMask = 0;
     ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvHeapDesc,
         IID_PPV_ARGS(&mCbvHeap)));
+
+    mCbvSrvUavDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 void BoxApp::BuildConstantBuffers()
 {
+    CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHeapHandle(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+
 	mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(md3dDevice.Get(), 1, true);
 
 	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
@@ -317,6 +329,19 @@ void BoxApp::BuildConstantBuffers()
 	md3dDevice->CreateConstantBufferView(
 		&cbvDesc,
 		mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+
+    cbvHeapHandle.Offset(1, mCbvSrvUavDescriptorSize);
+    mFrameCB = std::make_unique<UploadBuffer<FrameConstants>>(md3dDevice.Get(), 1, true);
+
+    UINT frameCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(FrameConstants));
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC frameCbvDesc;
+    frameCbvDesc.BufferLocation = mFrameCB->Resource()->GetGPUVirtualAddress();
+    frameCbvDesc.SizeInBytes = d3dUtil::CalcConstantBufferByteSize(sizeof(FrameConstants));
+
+    md3dDevice->CreateConstantBufferView(
+        &frameCbvDesc,
+        cbvHeapHandle);
 }
 
 void BoxApp::BuildRootSignature()
@@ -332,7 +357,7 @@ void BoxApp::BuildRootSignature()
 
 	// Create a single descriptor table of CBVs.
 	CD3DX12_DESCRIPTOR_RANGE cbvTable;
-	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 2, 0);
 	slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
 
 	// A root signature is an array of root parameters.
