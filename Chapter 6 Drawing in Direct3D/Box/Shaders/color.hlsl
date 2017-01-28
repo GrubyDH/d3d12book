@@ -11,6 +11,7 @@ cbuffer cbPerObject : register(b0)
 
 cbuffer cbPerFrame : register(b1)
 {
+    float4 gPulseColor;
     float gTime;
 };
 
@@ -44,5 +45,10 @@ VertexOut VS(VertexIn vin)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-    return pin.Color;
+    const float pi = 3.14159f;
+
+    float s = 0.5f * sin(2.0f * gTime - 0.25f * pi) + 0.5f;
+    float4 c = lerp(pin.Color, gPulseColor, s);
+
+    return c;
 }

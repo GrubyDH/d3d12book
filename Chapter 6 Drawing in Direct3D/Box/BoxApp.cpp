@@ -29,6 +29,7 @@ struct ObjectConstants
 
 struct FrameConstants
 {
+    XMFLOAT4 PulseColor;
     float Time;
 };
 
@@ -181,7 +182,8 @@ void BoxApp::Update(const GameTimer& gt)
     XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProjPyramid));
     mObjectCB->CopyData(1, objConstants);
 
-    FrameConstants frameConstants;;
+    FrameConstants frameConstants;
+    frameConstants.PulseColor = XMFLOAT4(Colors::Magenta);
     frameConstants.Time = gt.TotalTime();
     mFrameCB->CopyData(0, frameConstants);
 }
