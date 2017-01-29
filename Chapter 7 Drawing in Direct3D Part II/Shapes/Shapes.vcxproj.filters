@@ -16,6 +16,9 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{165187a6-5480-472f-9878-e4bfc485a0cb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Models">
+      <UniqueIdentifier>{5982279a-f884-4480-a961-cfc7619cf5e1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FrameResource.cpp">
@@ -65,10 +68,18 @@
     <ClInclude Include="..\..\Common\UploadBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ModelParser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\color.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Models\skull.txt">
+      <Filter>Models</Filter>
+    </Text>
   </ItemGroup>
 </Project>
