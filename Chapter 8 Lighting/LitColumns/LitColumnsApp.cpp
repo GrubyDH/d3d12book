@@ -428,12 +428,19 @@ void LitColumnsApp::UpdateMainPassCB(const GameTimer& gt)
 	mMainPassCB.TotalTime = gt.TotalTime();
 	mMainPassCB.DeltaTime = gt.DeltaTime();
 	mMainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
-	mMainPassCB.Lights[0].Direction = { 0.57735f, -0.57735f, 0.57735f };
-	mMainPassCB.Lights[0].Strength = { 0.6f, 0.6f, 0.6f };
-	mMainPassCB.Lights[1].Direction = { -0.57735f, -0.57735f, 0.57735f };
-	mMainPassCB.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
-	mMainPassCB.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
-	mMainPassCB.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
+
+    for (int i = 0; i < 5; ++i) {
+        int leftLightIdx = 2 * i;
+        int rightLightIdx = 2 * i + 1;
+
+        mMainPassCB.Lights[leftLightIdx].Position = { -5.0f, 3.5f, -10.0f + i * 5.0f };
+        mMainPassCB.Lights[leftLightIdx].FalloffStart = 0.5f;
+        mMainPassCB.Lights[leftLightIdx].FalloffEnd = 10.0f;
+
+        mMainPassCB.Lights[rightLightIdx].Position = { +5.0f, 3.5f, -10.0f + i * 5.0f };
+        mMainPassCB.Lights[rightLightIdx].FalloffStart = 0.5f;
+        mMainPassCB.Lights[rightLightIdx].FalloffEnd = 10.0f;
+    }
 
 	auto currPassCB = mCurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, mMainPassCB);
@@ -479,8 +486,16 @@ void LitColumnsApp::BuildShadersAndInputLayout()
 		NULL, NULL
 	};
 
-	mShaders["standardVS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["opaquePS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "PS", "ps_5_1");
+    const D3D_SHADER_MACRO lightDefines[] =
+    {
+        "NUM_DIR_LIGHTS", "0",
+        "NUM_POINT_LIGHTS", "10",
+        "NUM_SPOT_LIGHTS", "0",
+        NULL, NULL
+    };
+
+	mShaders["standardVS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", lightDefines, "VS", "vs_5_1");
+	mShaders["opaquePS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", lightDefines, "PS", "ps_5_1");
 	
     mInputLayout =
     {
