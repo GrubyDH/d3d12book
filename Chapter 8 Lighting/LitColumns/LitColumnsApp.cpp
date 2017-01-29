@@ -436,10 +436,12 @@ void LitColumnsApp::UpdateMainPassCB(const GameTimer& gt)
         mMainPassCB.Lights[leftLightIdx].Position = { -5.0f, 3.5f, -10.0f + i * 5.0f };
         mMainPassCB.Lights[leftLightIdx].FalloffStart = 0.5f;
         mMainPassCB.Lights[leftLightIdx].FalloffEnd = 10.0f;
+        mMainPassCB.Lights[leftLightIdx].SpotPower = 16.0f;
 
         mMainPassCB.Lights[rightLightIdx].Position = { +5.0f, 3.5f, -10.0f + i * 5.0f };
         mMainPassCB.Lights[rightLightIdx].FalloffStart = 0.5f;
         mMainPassCB.Lights[rightLightIdx].FalloffEnd = 10.0f;
+        mMainPassCB.Lights[rightLightIdx].SpotPower = 16.0f;
     }
 
 	auto currPassCB = mCurrFrameResource->PassCB.get();
@@ -489,8 +491,8 @@ void LitColumnsApp::BuildShadersAndInputLayout()
     const D3D_SHADER_MACRO lightDefines[] =
     {
         "NUM_DIR_LIGHTS", "0",
-        "NUM_POINT_LIGHTS", "10",
-        "NUM_SPOT_LIGHTS", "0",
+        "NUM_POINT_LIGHTS", "0",
+        "NUM_SPOT_LIGHTS", "10",
         NULL, NULL
     };
 
