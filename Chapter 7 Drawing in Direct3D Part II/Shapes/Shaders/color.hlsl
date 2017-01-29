@@ -27,6 +27,14 @@ cbuffer cbPass : register(b1)
     float gDeltaTime;
 };
 
+cbuffer cbConstants : register(b2)
+{
+    float m11, m12, m13, m14;
+    float m21, m22, m23, m24;
+    float m31, m32, m33, m34;
+    float m41, m42, m43, m44;
+}
+
 struct VertexIn
 {
 	float3 PosL  : POSITION;
@@ -44,7 +52,10 @@ VertexOut VS(VertexIn vin)
 	VertexOut vout;
 	
 	// Transform to homogeneous clip space.
-    float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
+    //float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
+
+    float4x4 constansWorld = float4x4(m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44);
+    float4 posW = mul(float4(vin.PosL, 1.0f), constansWorld);
     vout.PosH = mul(posW, gViewProj);
 	
 	// Just pass vertex color into the pixel shader.
