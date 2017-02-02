@@ -203,7 +203,7 @@ void CrateApp::OnResize()
     D3DApp::OnResize();
 
     // The window resized, so update the aspect ratio and recompute the projection matrix.
-    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f*MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f*MathHelper::Pi, AspectRatio(), 0.1f, 1000.0f);
     XMStoreFloat4x4(&mProj, P);
 }
 
@@ -330,7 +330,7 @@ void CrateApp::OnMouseMove(WPARAM btnState, int x, int y)
         mRadius += dx - dy;
 
         // Restrict the radius.
-        mRadius = MathHelper::Clamp(mRadius, 5.0f, 150.0f);
+        mRadius = MathHelper::Clamp(mRadius, 1.5f, 150.0f);
     }
 
     mLastMousePos.x = x;
@@ -431,7 +431,7 @@ void CrateApp::UpdateMainPassCB(const GameTimer& gt)
 	mMainPassCB.EyePosW = mEyePos;
 	mMainPassCB.RenderTargetSize = XMFLOAT2((float)mClientWidth, (float)mClientHeight);
 	mMainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
-	mMainPassCB.NearZ = 1.0f;
+	mMainPassCB.NearZ = 0.1f;
 	mMainPassCB.FarZ = 1000.0f;
 	mMainPassCB.TotalTime = gt.TotalTime();
 	mMainPassCB.DeltaTime = gt.DeltaTime();
@@ -656,6 +656,10 @@ void CrateApp::BuildRenderItems()
 	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
 	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
 	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
+    XMMATRIX texScale = XMMatrixScaling(3.0f, 3.0f, 3.0f);
+    XMMATRIX texTranslate = XMMatrixTranslation(-0.5f, -0.5f, 0.0f);
+    XMMATRIX texTransform = XMMatrixMultiply(texScale, texTranslate);
+    XMStoreFloat4x4(&boxRitem->TexTransform, texTransform);
 	mAllRitems.push_back(std::move(boxRitem));
 
 	// All the render items are opaque.
