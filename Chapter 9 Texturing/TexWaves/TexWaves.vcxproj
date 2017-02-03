@@ -22,7 +22,7 @@
     <ProjectGuid>{0EB5ECAA-3BCB-4B58-9FA9-88176C0E1CFF}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>TexWaves</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.10240.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
