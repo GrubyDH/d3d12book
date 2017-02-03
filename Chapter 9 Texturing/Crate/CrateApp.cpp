@@ -96,8 +96,6 @@ private:
     FrameResource* mCurrFrameResource = nullptr;
     int mCurrFrameResourceIndex = 0;
 
-    UINT mCbvSrvDescriptorSize = 0;
-
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
 
 	ComPtr<ID3D12DescriptorHeap> mSrvDescriptorHeap = nullptr;
@@ -172,11 +170,6 @@ bool CrateApp::Initialize()
     // Reset the command list to prep for initialization commands.
     ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
-    // Get the increment size of a descriptor in this heap type.  This is hardware specific, 
-	// so we have to query this information.
-    mCbvSrvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
- 
 	LoadTextures();
     BuildRootSignature();
 	BuildDescriptorHeaps();
@@ -359,7 +352,14 @@ void CrateApp::UpdateCamera(const GameTimer& gt)
 
 void CrateApp::AnimateMaterials(const GameTimer& gt)
 {
-	
+    float angle = gt.TotalTime() * MathHelper::Pi;
+    XMMATRIX matTranslate = XMMatrixTranslation(-0.5f, -0.5f, 0.0f);
+    XMMATRIX matRotate = XMMatrixRotationZ(angle);
+    XMMATRIX matTranslateBack = XMMatrixTranslation(0.5f, 0.5f, 0.0f);
+    XMMATRIX matTransform = XMMatrixMultiply(matTranslate, matRotate);
+    matTransform = XMMatrixMultiply(matTransform, matTranslateBack);
+    XMStoreFloat4x4(&mMaterials["flare"]->MatTransform, matTransform);
+    mMaterials["flare"]->NumFramesDirty = gNumFrameResources;
 }
 
 void CrateApp::UpdateObjectCBs(const GameTimer& gt)
@@ -449,20 +449,38 @@ void CrateApp::UpdateMainPassCB(const GameTimer& gt)
 
 void CrateApp::LoadTextures()
 {
-	auto woodCrateTex = std::make_unique<Texture>();
-	woodCrateTex->Name = "woodCrateTex";
-	woodCrateTex->Filename = L"../../Textures/WoodCrate01_mod.dds";
-	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), woodCrateTex->Filename.c_str(),
-		woodCrateTex->Resource, woodCrateTex->UploadHeap));
- 
-	mTextures[woodCrateTex->Name] = std::move(woodCrateTex);
+	//auto woodCrateTex = std::make_unique<Texture>();
+	//woodCrateTex->Name = "woodCrateTex";
+	//woodCrateTex->Filename = L"../../Textures/WoodCrate01_mod.dds";
+	//ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
+	//	mCommandList.Get(), woodCrateTex->Filename.c_str(),
+	//	woodCrateTex->Resource, woodCrateTex->UploadHeap));
+ //
+	//mTextures[woodCrateTex->Name] = std::move(woodCrateTex);
+
+    auto flareTex = std::make_unique<Texture>();
+    flareTex->Name = "flareTex";
+    flareTex->Filename = L"Textures/flare.dds";
+    ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
+        mCommandList.Get(), flareTex->Filename.c_str(),
+        flareTex->Resource, flareTex->UploadHeap));
+
+    mTextures[flareTex->Name] = std::move(flareTex);
+
+    auto flareAlphaTex = std::make_unique<Texture>();
+    flareAlphaTex->Name = "flareAlphaTex";
+    flareAlphaTex->Filename = L"Textures/flarealpha.dds";
+    ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
+        mCommandList.Get(), flareAlphaTex->Filename.c_str(),
+        flareAlphaTex->Resource, flareAlphaTex->UploadHeap));
+
+    mTextures[flareAlphaTex->Name] = std::move(flareAlphaTex);
 }
 
 void CrateApp::BuildRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE texTable;
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0);
 
     // Root parameter can be a table, root descriptor or root constants.
     CD3DX12_ROOT_PARAMETER slotRootParameter[4];
@@ -505,7 +523,7 @@ void CrateApp::BuildDescriptorHeaps()
 	// Create the SRV heap.
 	//
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 1;
+	srvHeapDesc.NumDescriptors = 2;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
@@ -515,17 +533,25 @@ void CrateApp::BuildDescriptorHeaps()
 	//
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(mSrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-	auto woodCrateTex = mTextures["woodCrateTex"]->Resource;
+	auto flareTex = mTextures["flareTex"]->Resource;
  
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = woodCrateTex->GetDesc().Format;
+	srvDesc.Format = flareTex->GetDesc().Format;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.MipLevels = woodCrateTex->GetDesc().MipLevels;
+	srvDesc.Texture2D.MipLevels = flareTex->GetDesc().MipLevels;
 	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
-	md3dDevice->CreateShaderResourceView(woodCrateTex.Get(), &srvDesc, hDescriptor);
+	md3dDevice->CreateShaderResourceView(flareTex.Get(), &srvDesc, hDescriptor);
+
+    auto flareAlphaTex = mTextures["flareAlphaTex"]->Resource;
+
+    srvDesc.Format = flareAlphaTex->GetDesc().Format;
+    srvDesc.Texture2D.MipLevels = flareAlphaTex->GetDesc().MipLevels;
+
+    hDescriptor.Offset(mCbvSrvUavDescriptorSize);
+    md3dDevice->CreateShaderResourceView(flareAlphaTex.Get(), &srvDesc, hDescriptor);
 }
 
 void CrateApp::BuildShadersAndInputLayout()
@@ -635,31 +661,28 @@ void CrateApp::BuildFrameResources()
 
 void CrateApp::BuildMaterials()
 {
-	auto woodCrate = std::make_unique<Material>();
-	woodCrate->Name = "woodCrate";
-	woodCrate->MatCBIndex = 0;
-	woodCrate->DiffuseSrvHeapIndex = 0;
-	woodCrate->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	woodCrate->FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
-	woodCrate->Roughness = 0.2f;
+	auto flare = std::make_unique<Material>();
+    flare->Name = "flare";
+    flare->MatCBIndex = 0;
+    flare->DiffuseSrvHeapIndex = 0;
+    flare->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    flare->FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+    flare->Roughness = 0.2f;
 
-	mMaterials["woodCrate"] = std::move(woodCrate);
+	mMaterials["flare"] = std::move(flare);
 }
 
 void CrateApp::BuildRenderItems()
 {
 	auto boxRitem = std::make_unique<RenderItem>();
 	boxRitem->ObjCBIndex = 0;
-	boxRitem->Mat = mMaterials["woodCrate"].get();
+	boxRitem->Mat = mMaterials["flare"].get();
 	boxRitem->Geo = mGeometries["boxGeo"].get();
 	boxRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
 	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
 	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
-    XMMATRIX texScale = XMMatrixScaling(3.0f, 3.0f, 3.0f);
-    XMMATRIX texTranslate = XMMatrixTranslation(-0.5f, -0.5f, 0.0f);
-    XMMATRIX texTransform = XMMatrixMultiply(texScale, texTranslate);
-    XMStoreFloat4x4(&boxRitem->TexTransform, texTransform);
+    boxRitem->TexTransform = MathHelper::Identity4x4();
 	mAllRitems.push_back(std::move(boxRitem));
 
 	// All the render items are opaque.
@@ -685,7 +708,7 @@ void CrateApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::ve
         cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
 		CD3DX12_GPU_DESCRIPTOR_HANDLE tex(mSrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-		tex.Offset(ri->Mat->DiffuseSrvHeapIndex, mCbvSrvDescriptorSize);
+		tex.Offset(ri->Mat->DiffuseSrvHeapIndex, mCbvSrvUavDescriptorSize);
 
         D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress() + ri->ObjCBIndex*objCBByteSize;
 		D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress() + ri->Mat->MatCBIndex*matCBByteSize;

@@ -170,6 +170,11 @@
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="Textures\flare.dds" />
+    <Image Include="Textures\flarealpha.dds" />
+    <Image Include="Textures\mipmaps.dds" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
