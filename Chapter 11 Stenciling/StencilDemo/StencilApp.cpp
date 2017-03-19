@@ -54,7 +54,6 @@ struct RenderItem
 enum class RenderLayer : int
 {
 	Opaque = 0,
-    OpaqueDepthOff,
 	Mirrors ,
 	Reflected,
 	Transparent,
@@ -263,7 +262,7 @@ void StencilApp::Draw(const GameTimer& gt)
 
     // A command list can be reset after it has been added to the command queue via ExecuteCommandList.
     // Reusing the command list reuses memory.
-    ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaqueDepthOff"].Get()));
+    ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
 
     mCommandList->RSSetViewports(1, &mScreenViewport);
     mCommandList->RSSetScissorRects(1, &mScissorRect);
@@ -289,33 +288,30 @@ void StencilApp::Draw(const GameTimer& gt)
 	// Draw opaque items--floors, walls, skull.
 	auto passCB = mCurrFrameResource->PassCB->Resource();
 	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
-    DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::OpaqueDepthOff]);
-
-    mCommandList->SetPipelineState(mPSOs["opaque"].Get());
     DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Opaque]);
 	
-	//// Mark the visible mirror pixels in the stencil buffer with the value 1
-	//mCommandList->OMSetStencilRef(1);
-	//mCommandList->SetPipelineState(mPSOs["markStencilMirrors"].Get());
-	//DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Mirrors]);
+	// Mark the visible mirror pixels in the stencil buffer with the value 1
+	mCommandList->OMSetStencilRef(1);
+	mCommandList->SetPipelineState(mPSOs["markStencilMirrors"].Get());
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Mirrors]);
 
-	//// Draw the reflection into the mirror only (only for pixels where the stencil buffer is 1).
-	//// Note that we must supply a different per-pass constant buffer--one with the lights reflected.
-	//mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress() + 1 * passCBByteSize);
-	//mCommandList->SetPipelineState(mPSOs["drawStencilReflections"].Get());
-	//DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Reflected]);
+	// Draw the reflection into the mirror only (only for pixels where the stencil buffer is 1).
+	// Note that we must supply a different per-pass constant buffer--one with the lights reflected.
+	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress() + 1 * passCBByteSize);
+	mCommandList->SetPipelineState(mPSOs["drawStencilReflections"].Get());
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Reflected]);
 
-	//// Restore main pass constants and stencil ref.
-	//mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
-	//mCommandList->OMSetStencilRef(0);
+	// Restore main pass constants and stencil ref.
+	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
+	mCommandList->OMSetStencilRef(0);
 
-	//// Draw mirror with transparency so reflection blends through.
-	//mCommandList->SetPipelineState(mPSOs["transparent"].Get());
-	//DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Transparent]);
+	// Draw mirror with transparency so reflection blends through.
+	mCommandList->SetPipelineState(mPSOs["transparent"].Get());
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Transparent]);
 
-	//// Draw shadows
-	//mCommandList->SetPipelineState(mPSOs["shadow"].Get());
-	//DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Shadow]);
+	// Draw shadows
+	mCommandList->SetPipelineState(mPSOs["shadow"].Get());
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Shadow]);
 	
     // Indicate a state transition on the resource usage.
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
@@ -403,12 +399,6 @@ void StencilApp::OnKeyboardInput(const GameTimer& gt)
 
 	if(GetAsyncKeyState('S') & 0x8000)
 		mSkullTranslation.y -= 1.0f*dt;
-
-    if (GetAsyncKeyState('Q') & 0x8000)
-        mSkullTranslation.z += 1.0f*dt;
-
-    if (GetAsyncKeyState('E') & 0x8000)
-        mSkullTranslation.z -= 1.0f*dt;
 
 	// Don't let user move below ground plane.
 	mSkullTranslation.y = MathHelper::Max(mSkullTranslation.y, 0.0f);
@@ -938,10 +928,6 @@ void StencilApp::BuildPSOs()
 	opaquePsoDesc.DSVFormat = mDepthStencilFormat;
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
 
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueDepthOffPsoDesc = opaquePsoDesc;
-    opaqueDepthOffPsoDesc.DepthStencilState.DepthEnable = false;
-    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaqueDepthOffPsoDesc, IID_PPV_ARGS(&mPSOs["opaqueDepthOff"])));
-
 	//
 	// PSO for transparent objects
 	//
@@ -1134,7 +1120,7 @@ void StencilApp::BuildRenderItems()
 	wallsRitem->IndexCount = wallsRitem->Geo->DrawArgs["wall"].IndexCount;
 	wallsRitem->StartIndexLocation = wallsRitem->Geo->DrawArgs["wall"].StartIndexLocation;
 	wallsRitem->BaseVertexLocation = wallsRitem->Geo->DrawArgs["wall"].BaseVertexLocation;
-	mRitemLayer[(int)RenderLayer::OpaqueDepthOff].push_back(wallsRitem.get());
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(wallsRitem.get());
 
 	auto skullRitem = std::make_unique<RenderItem>();
 	skullRitem->World = MathHelper::Identity4x4();
