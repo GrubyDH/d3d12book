@@ -499,16 +499,22 @@ void SsaoApp::OnKeyboardInput(const GameTimer& gt)
 	const float dt = gt.DeltaTime();
 
 	if(GetAsyncKeyState('W') & 0x8000)
-		mCamera.Walk(10.0f*dt);
+		mCamera.Walk(10.0f * dt);
 
 	if(GetAsyncKeyState('S') & 0x8000)
-		mCamera.Walk(-10.0f*dt);
+		mCamera.Walk(-10.0f * dt);
 
 	if(GetAsyncKeyState('A') & 0x8000)
-		mCamera.Strafe(-10.0f*dt);
+		mCamera.Strafe(-10.0f * dt);
 
 	if(GetAsyncKeyState('D') & 0x8000)
-		mCamera.Strafe(10.0f*dt);
+		mCamera.Strafe(10.0f * dt);
+
+	if (GetAsyncKeyState('Q') & 0x8000)
+		mCamera.Levitate(10.0f * dt);
+
+	if (GetAsyncKeyState('E') & 0x8000)
+		mCamera.Levitate(-10.0f * dt);
 
 	mCamera.UpdateViewMatrix();
 }
