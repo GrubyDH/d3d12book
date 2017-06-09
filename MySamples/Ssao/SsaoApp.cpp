@@ -56,6 +56,7 @@ enum class RenderLayer : int
 {
 	Opaque = 0,
     Debug,
+	DebugSsao,
 	Sky,
 	Count
 };
@@ -437,6 +438,9 @@ void SsaoApp::Draw(const GameTimer& gt)
 
     mCommandList->SetPipelineState(mPSOs["debug"].Get());
     DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Debug]);
+
+	mCommandList->SetPipelineState(mPSOs["debugSsao"].Get());
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::DebugSsao]);
 
 	mCommandList->SetPipelineState(mPSOs["sky"].Get());
 	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Sky]);
@@ -996,6 +1000,9 @@ void SsaoApp::BuildShadersAndInputLayout()
     mShaders["debugVS"] = d3dUtil::CompileShader(L"Shaders\\ShadowDebug.hlsl", nullptr, "VS", "vs_5_1");
     mShaders["debugPS"] = d3dUtil::CompileShader(L"Shaders\\ShadowDebug.hlsl", nullptr, "PS", "ps_5_1");
 
+	mShaders["debugSsaoVS"] = d3dUtil::CompileShader(L"Shaders\\SsaoDebug.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["debugSsaoPS"] = d3dUtil::CompileShader(L"Shaders\\SsaoDebug.hlsl", nullptr, "PS", "ps_5_1");
+
     mShaders["drawNormalsVS"] = d3dUtil::CompileShader(L"Shaders\\DrawNormals.hlsl", nullptr, "VS", "vs_5_1");
     mShaders["drawNormalsPS"] = d3dUtil::CompileShader(L"Shaders\\DrawNormals.hlsl", nullptr, "PS", "ps_5_1");
 
@@ -1024,7 +1031,7 @@ void SsaoApp::BuildShapeGeometry()
 	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 30.0f, 60, 40);
 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
 	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20);
-    GeometryGenerator::MeshData quad = geoGen.CreateQuad(0.5f, -0.5f, 0.5f, 0.5f, 0.0f);
+    GeometryGenerator::MeshData quad = geoGen.CreateQuad(-0.5f, 0.5f, 1.0f, 1.0f, 0.0f);
     
 	//
 	// We are concatenating all the geometry into one big vertex/index buffer.  So
@@ -1355,6 +1362,22 @@ void SsaoApp::BuildPSOs()
     };
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&debugPsoDesc, IID_PPV_ARGS(&mPSOs["debug"])));
 
+	//
+	// PSO for debug SSAO layer.
+	//
+	debugPsoDesc.pRootSignature = mRootSignature.Get();
+	debugPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["debugSsaoVS"]->GetBufferPointer()),
+		mShaders["debugSsaoVS"]->GetBufferSize()
+	};
+	debugPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["debugSsaoPS"]->GetBufferPointer()),
+		mShaders["debugSsaoPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&debugPsoDesc, IID_PPV_ARGS(&mPSOs["debugSsao"])));
+
     //
     // PSO for drawing normals.
     //
@@ -1524,7 +1547,7 @@ void SsaoApp::BuildRenderItems()
 	mAllRitems.push_back(std::move(skyRitem));
     
     auto quadRitem = std::make_unique<RenderItem>();
-    quadRitem->World = MathHelper::Identity4x4();
+	XMStoreFloat4x4(&quadRitem->World, XMMatrixScaling(0.5f, 0.5f, 0.0f) * XMMatrixTranslation(0.75f, -0.75f, 0.0f));
     quadRitem->TexTransform = MathHelper::Identity4x4();
     quadRitem->ObjCBIndex = 1;
     quadRitem->Mat = mMaterials["bricks0"].get();
@@ -1536,11 +1559,25 @@ void SsaoApp::BuildRenderItems()
 
     mRitemLayer[(int)RenderLayer::Debug].push_back(quadRitem.get());
     mAllRitems.push_back(std::move(quadRitem));
-    
+
+	quadRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&quadRitem->World, XMMatrixScaling(0.5f, 0.5f, 0.0f) * XMMatrixTranslation(-0.75f, -0.75f, 0.0f));
+	quadRitem->TexTransform = MathHelper::Identity4x4();
+	quadRitem->ObjCBIndex = 2;
+	quadRitem->Mat = mMaterials["bricks0"].get();
+	quadRitem->Geo = mGeometries["shapeGeo"].get();
+	quadRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	quadRitem->IndexCount = quadRitem->Geo->DrawArgs["quad"].IndexCount;
+	quadRitem->StartIndexLocation = quadRitem->Geo->DrawArgs["quad"].StartIndexLocation;
+	quadRitem->BaseVertexLocation = quadRitem->Geo->DrawArgs["quad"].BaseVertexLocation;
+
+	mRitemLayer[(int)RenderLayer::DebugSsao].push_back(quadRitem.get());
+	mAllRitems.push_back(std::move(quadRitem));
+
 	auto boxRitem = std::make_unique<RenderItem>();
 	XMStoreFloat4x4(&boxRitem->World, XMMatrixScaling(2.0f, 1.0f, 2.0f)*XMMatrixTranslation(0.0f, 0.5f, 0.0f));
 	XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(1.0f, 0.5f, 1.0f));
-	boxRitem->ObjCBIndex = 2;
+	boxRitem->ObjCBIndex = 3;
 	boxRitem->Mat = mMaterials["bricks0"].get();
 	boxRitem->Geo = mGeometries["shapeGeo"].get();
 	boxRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -1554,7 +1591,7 @@ void SsaoApp::BuildRenderItems()
     auto skullRitem = std::make_unique<RenderItem>();
     XMStoreFloat4x4(&skullRitem->World, XMMatrixScaling(0.4f, 0.4f, 0.4f)*XMMatrixTranslation(0.0f, 1.0f, 0.0f));
     skullRitem->TexTransform = MathHelper::Identity4x4();
-    skullRitem->ObjCBIndex = 3;
+    skullRitem->ObjCBIndex = 4;
     skullRitem->Mat = mMaterials["skullMat"].get();
     skullRitem->Geo = mGeometries["skullGeo"].get();
     skullRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -1568,7 +1605,7 @@ void SsaoApp::BuildRenderItems()
     auto gridRitem = std::make_unique<RenderItem>();
     gridRitem->World = MathHelper::Identity4x4();
 	XMStoreFloat4x4(&gridRitem->TexTransform, XMMatrixScaling(8.0f, 8.0f, 1.0f));
-	gridRitem->ObjCBIndex = 4;
+	gridRitem->ObjCBIndex = 5;
 	gridRitem->Mat = mMaterials["tile0"].get();
 	gridRitem->Geo = mGeometries["shapeGeo"].get();
 	gridRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -1580,7 +1617,7 @@ void SsaoApp::BuildRenderItems()
 	mAllRitems.push_back(std::move(gridRitem));
 
 	XMMATRIX brickTexTransform = XMMatrixScaling(1.5f, 2.0f, 1.0f);
-	UINT objCBIndex = 5;
+	UINT objCBIndex = 6;
 	for(int i = 0; i < 5; ++i)
 	{
 		auto leftCylRitem = std::make_unique<RenderItem>();
