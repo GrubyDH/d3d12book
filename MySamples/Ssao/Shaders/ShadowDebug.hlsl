@@ -21,17 +21,16 @@ VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
 
-    // Already in homogeneous clip space.
-    vout.PosH = float4(vin.PosL, 1.0f);
-	
+	// Already in homogeneous clip space.
+	// Use gWorld as additional transformation within homogenous clip space.
+	vout.PosH = mul(float4(vin.PosL, 1.0f), gWorld);
+
 	vout.TexC = vin.TexC;
-	
+
     return vout;
 }
 
 float4 PS(VertexOut pin) : SV_Target
 {
-    return float4(gSsaoMap.Sample(gsamLinearWrap, pin.TexC).rrr, 1.0f);
+    return float4(gShadowMap.Sample(gsamLinearWrap, pin.TexC).rrr, 1.0f);
 }
-
-
