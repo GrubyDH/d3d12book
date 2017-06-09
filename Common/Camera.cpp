@@ -198,6 +198,17 @@ void Camera::Walk(float d)
 	mViewDirty = true;
 }
 
+void Camera::Levitate(float d)
+{
+	// mPosition += d*mLook
+	XMVECTOR s = XMVectorReplicate(d);
+	XMVECTOR u = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	XMVECTOR p = XMLoadFloat3(&mPosition);
+	XMStoreFloat3(&mPosition, XMVectorMultiplyAdd(s, u, p));
+
+	mViewDirty = true;
+}
+
 void Camera::Pitch(float angle)
 {
 	// Rotate up and look vector about the right vector.
