@@ -9,6 +9,7 @@
 #include "../../Common/Camera.h"
 #include "FrameResource.h"
 #include "ShadowMap.h"
+#include "GBuffer.h"
 #include "Ssao.h"
 
 using Microsoft::WRL::ComPtr;
@@ -139,8 +140,8 @@ private:
 
 	UINT mSkyTexHeapIndex = 0;
     UINT mShadowMapHeapIndex = 0;
+    UINT mGBufferHeapIndexStart = 0;
     UINT mSsaoHeapIndexStart = 0;
-    UINT mSsaoAmbientMapIndex = 0;
 
     UINT mNullCubeSrvIndex = 0;
     UINT mNullTexSrvIndex1 = 0;
@@ -151,7 +152,9 @@ private:
     PassConstants mMainPassCB;  // index 0 of pass cbuffer.
     PassConstants mShadowPassCB;// index 1 of pass cbuffer.
 
-	Camera mCamera;
+    Camera mCamera;
+
+    std::unique_ptr<GBuffer> mGBuffer;
 
     std::unique_ptr<ShadowMap> mShadowMap;
 
@@ -230,6 +233,11 @@ bool SsaoApp::Initialize()
     mShadowMap = std::make_unique<ShadowMap>(md3dDevice.Get(),
         2048, 2048);
 
+    mGBuffer = std::make_unique<GBuffer>(
+        md3dDevice.Get(),
+        mCommandList.Get(),
+        mClientWidth, mClientHeight);
+
     mSsao = std::make_unique<Ssao>(
         md3dDevice.Get(),
         mCommandList.Get(),
@@ -262,9 +270,11 @@ bool SsaoApp::Initialize()
 
 void SsaoApp::CreateRtvAndDsvDescriptorHeaps()
 {
-    // Add +1 for screen normal map, +2 for ambient maps.
+    // TODO: Design this better.
+
+    // Add +1 for GBuffer normal map, +1 for GBuffer diffuse map, +2 for ambient maps.
     D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-    rtvHeapDesc.NumDescriptors = SwapChainBufferCount + 3;
+    rtvHeapDesc.NumDescriptors = SwapChainBufferCount + 4;
     rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
     rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     rtvHeapDesc.NodeMask = 0;
@@ -280,19 +290,23 @@ void SsaoApp::CreateRtvAndDsvDescriptorHeaps()
     ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
         &dsvHeapDesc, IID_PPV_ARGS(mDsvHeap.GetAddressOf())));
 }
- 
+
 void SsaoApp::OnResize()
 {
     D3DApp::OnResize();
 
-	mCamera.SetLens(0.25f*MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+    mCamera.SetLens(0.25f*MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 
-    if(mSsao != nullptr)
-    {
-        mSsao->OnResize(mClientWidth, mClientHeight);
-
+    if (mGBuffer != nullptr) {
+        mGBuffer->OnResize(mClientWidth, mClientHeight);
         // Resources changed, so need to rebuild descriptors.
-        mSsao->RebuildDescriptors(mDepthStencilBuffer.Get());
+        mGBuffer->RebuildDescriptors(mDepthStencilBuffer.Get());
+    }
+
+    if(mSsao != nullptr) {
+        mSsao->OnResize(mClientWidth, mClientHeight);
+        // Resources changed, so need to rebuild descriptors.
+        mSsao->RebuildDescriptors(mDepthStencilBuffer.Get(), mGBuffer.get());
     }
 }
 
@@ -899,7 +913,7 @@ void SsaoApp::BuildDescriptorHeaps()
 	// Create the SRV heap.
 	//
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 18;
+	srvHeapDesc.NumDescriptors = 19;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
@@ -947,8 +961,8 @@ void SsaoApp::BuildDescriptorHeaps()
 	mSkyTexHeapIndex = (UINT)tex2DList.size();
     mShadowMapHeapIndex = mSkyTexHeapIndex + 1;
     mSsaoHeapIndexStart = mShadowMapHeapIndex + 1;
-    mSsaoAmbientMapIndex = mSsaoHeapIndexStart + 3;
-    mNullCubeSrvIndex = mSsaoHeapIndexStart + 5;
+    mGBufferHeapIndexStart = mSsaoHeapIndexStart + 5;
+    mNullCubeSrvIndex = mGBufferHeapIndexStart + 3;
     mNullTexSrvIndex1 = mNullCubeSrvIndex + 1;
     mNullTexSrvIndex2 = mNullTexSrvIndex1 + 1;
 
@@ -973,11 +987,21 @@ void SsaoApp::BuildDescriptorHeaps()
         GetGpuSrv(mShadowMapHeapIndex),
         GetDsv(1));
 
+    mGBuffer->BuildDescriptors(
+        mDepthStencilBuffer.Get(),
+        GetCpuSrv(mGBufferHeapIndexStart),
+        GetGpuSrv(mGBufferHeapIndexStart),
+        GetRtv(SwapChainBufferCount),
+        mCbvSrvUavDescriptorSize,
+        mRtvDescriptorSize);
+
+    // TODO: Don't use "magical" 2.
     mSsao->BuildDescriptors(
         mDepthStencilBuffer.Get(),
+        mGBuffer.get(),
         GetCpuSrv(mSsaoHeapIndexStart),
         GetGpuSrv(mSsaoHeapIndexStart),
-        GetRtv(SwapChainBufferCount),
+        GetRtv(SwapChainBufferCount + 2),
         mCbvSrvUavDescriptorSize,
         mRtvDescriptorSize);
 }
@@ -1392,7 +1416,7 @@ void SsaoApp::BuildPSOs()
         reinterpret_cast<BYTE*>(mShaders["drawNormalsPS"]->GetBufferPointer()),
         mShaders["drawNormalsPS"]->GetBufferSize()
     };
-    drawNormalsPsoDesc.RTVFormats[0] = Ssao::NormalMapFormat;
+    drawNormalsPsoDesc.RTVFormats[0] = GBuffer::NormalMapFormat;
     drawNormalsPsoDesc.SampleDesc.Count = 1;
     drawNormalsPsoDesc.SampleDesc.Quality = 0;
     drawNormalsPsoDesc.DSVFormat = mDepthStencilFormat;
@@ -1742,8 +1766,8 @@ void SsaoApp::DrawNormalsAndDepth()
 	mCommandList->RSSetViewports(1, &mScreenViewport);
     mCommandList->RSSetScissorRects(1, &mScissorRect);
 
-	auto normalMap = mSsao->NormalMap();
-	auto normalMapRtv = mSsao->NormalMapRtv();
+	auto normalMap = mGBuffer->NormalMap();
+	auto normalMapRtv = mGBuffer->NormalMapRtv();
 	
     // Change to RENDER_TARGET.
     mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(normalMap,

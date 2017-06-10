@@ -9,8 +9,9 @@
 
 #include "../../Common/d3dUtil.h"
 #include "FrameResource.h"
- 
- 
+
+class GBuffer;
+
 class Ssao
 {
 public:
@@ -23,7 +24,6 @@ public:
     ~Ssao() = default; 
 
     static const DXGI_FORMAT AmbientMapFormat = DXGI_FORMAT_R16_UNORM;
-    static const DXGI_FORMAT NormalMapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
     static const int MaxBlurRadius = 5;
 
@@ -33,23 +33,20 @@ public:
     void GetOffsetVectors(DirectX::XMFLOAT4 offsets[14]);
     std::vector<float> CalcGaussWeights(float sigma);
 
-
-	ID3D12Resource* NormalMap();
 	ID3D12Resource* AmbientMap();
-	
-    CD3DX12_CPU_DESCRIPTOR_HANDLE NormalMapRtv()const;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE NormalMapSrv()const;
+
     CD3DX12_GPU_DESCRIPTOR_HANDLE AmbientMapSrv()const;
 
 	void BuildDescriptors(
         ID3D12Resource* depthStencilBuffer,
+        GBuffer* gBuffer,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,
 		CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv,
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv,
         UINT cbvSrvUavDescriptorSize,
         UINT rtvDescriptorSize);
 
-    void RebuildDescriptors(ID3D12Resource* depthStencilBuffer);
+    void RebuildDescriptors(ID3D12Resource* depthStencilBuffer, GBuffer* gBuffer);
 
     void SetPSOs(ID3D12PipelineState* ssaoPso, ID3D12PipelineState* ssaoBlurPso);
 
@@ -96,13 +93,11 @@ private:
 	 
     Microsoft::WRL::ComPtr<ID3D12Resource> mRandomVectorMap;
 	Microsoft::WRL::ComPtr<ID3D12Resource> mRandomVectorMapUploadBuffer;
-    Microsoft::WRL::ComPtr<ID3D12Resource> mNormalMap;
     Microsoft::WRL::ComPtr<ID3D12Resource> mAmbientMap0;
     Microsoft::WRL::ComPtr<ID3D12Resource> mAmbientMap1;
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE mhNormalMapCpuSrv;
     CD3DX12_GPU_DESCRIPTOR_HANDLE mhNormalMapGpuSrv;
-    CD3DX12_CPU_DESCRIPTOR_HANDLE mhNormalMapCpuRtv;
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE mhDepthMapCpuSrv;
     CD3DX12_GPU_DESCRIPTOR_HANDLE mhDepthMapGpuSrv;
