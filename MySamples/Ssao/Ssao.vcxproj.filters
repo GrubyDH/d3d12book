@@ -91,35 +91,35 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\Common.hlsl">
+    <None Include="Shaders\Common.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\Default.hlsl">
+    </None>
+    <None Include="Shaders\Default.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\DrawNormals.hlsl">
+    </None>
+    <None Include="Shaders\DrawNormals.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\LightingUtil.hlsl">
+    </None>
+    <None Include="Shaders\LightingUtil.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShadowDebug.hlsl">
+    </None>
+    <None Include="Shaders\ShadowDebug.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\Shadows.hlsl">
+    </None>
+    <None Include="Shaders\Shadows.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\Sky.hlsl">
+    </None>
+    <None Include="Shaders\Sky.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\Ssao.hlsl">
+    </None>
+    <None Include="Shaders\Ssao.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\SsaoBlur.hlsl">
+    </None>
+    <None Include="Shaders\SsaoBlur.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\SsaoDebug.hlsl">
+    </None>
+    <None Include="Shaders\SsaoDebug.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
+    </None>
   </ItemGroup>
 </Project>
