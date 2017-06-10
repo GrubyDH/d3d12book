@@ -1308,8 +1308,8 @@ void SsaoApp::BuildPSOs()
     basePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     basePsoDesc.NumRenderTargets = 1;
     basePsoDesc.RTVFormats[0] = mBackBufferFormat;
-    basePsoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
-    basePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+    basePsoDesc.SampleDesc.Count = 1;
+    basePsoDesc.SampleDesc.Quality = 0;
     basePsoDesc.DSVFormat = mDepthStencilFormat;
 
     //
