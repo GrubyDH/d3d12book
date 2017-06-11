@@ -102,6 +102,7 @@ protected:
 	static const int SwapChainBufferCount = 2;
 	int mCurrBackBuffer = 0;
     Microsoft::WRL::ComPtr<ID3D12Resource> mSwapChainBuffer[SwapChainBufferCount];
+    // TODO: What to do about this in deferred mode? Simply ignore?
     Microsoft::WRL::ComPtr<ID3D12Resource> mDepthStencilBuffer;
 
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
@@ -118,6 +119,7 @@ protected:
 	std::wstring mMainWndCaption = L"d3d App";
 	D3D_DRIVER_TYPE md3dDriverType = D3D_DRIVER_TYPE_HARDWARE;
     DXGI_FORMAT mBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+    // TODO: What to do about this in deferred mode? It is bad to have this in two places.
     DXGI_FORMAT mDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	int mClientWidth = 1920;
 	int mClientHeight = 1080;
