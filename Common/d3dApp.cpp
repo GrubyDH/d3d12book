@@ -133,9 +133,6 @@ void D3DApp::OnResize()
     ResizeSwapChain();
     ResizeDepthBuffer();
     UpdateViewportAndScissors();
-
-    // Wait until resize is complete.
-    FlushCommandQueue();
 }
 
 LRESULT D3DApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -465,8 +462,6 @@ void D3DApp::ResizeSwapChain()
 
 void D3DApp::ResizeDepthBuffer()
 {
-    ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
-
     mDepthStencilBuffer.Reset();
 
     // Create the depth/stencil buffer and view.
@@ -498,7 +493,7 @@ void D3DApp::ResizeDepthBuffer()
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         &depthStencilDesc,
-        D3D12_RESOURCE_STATE_COMMON,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE,
         &optClear,
         IID_PPV_ARGS(mDepthStencilBuffer.GetAddressOf())));
 
@@ -509,15 +504,6 @@ void D3DApp::ResizeDepthBuffer()
     dsvDesc.Format = mDepthStencilFormat;
     dsvDesc.Texture2D.MipSlice = 0;
     md3dDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, DepthStencilView());
-
-    // Transition the resource from its initial state to be used as a depth buffer.
-    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-        D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
-
-    // Execute the resize commands.
-    ThrowIfFailed(mCommandList->Close());
-    ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
-    mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 }
 
 void D3DApp::UpdateViewportAndScissors()
