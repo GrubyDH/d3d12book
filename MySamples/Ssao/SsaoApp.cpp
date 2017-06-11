@@ -293,20 +293,28 @@ void SsaoApp::CreateRtvAndDsvDescriptorHeaps()
 
 void SsaoApp::OnResize()
 {
-    D3DApp::OnResize();
+    assert(md3dDevice);
+    assert(mSwapChain);
+    assert(mDirectCmdListAlloc);
+
+    // Flush before changing any resources.
+    FlushCommandQueue();
+
+    ResizeSwapChain();
+    UpdateViewportAndScissors();
 
     mCamera.SetLens(0.25f*MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 
     if (mGBuffer != nullptr) {
         mGBuffer->OnResize(mClientWidth, mClientHeight);
         // Resources changed, so need to rebuild descriptors.
-        mGBuffer->RebuildDescriptors(mDepthStencilBuffer.Get());
+        mGBuffer->RebuildDescriptors();
     }
 
     if (mSsao != nullptr) {
         mSsao->OnResize(mClientWidth, mClientHeight);
         // Resources changed, so need to rebuild descriptors.
-        mSsao->RebuildDescriptors(mDepthStencilBuffer.Get(), mGBuffer.get());
+        mSsao->RebuildDescriptors(mGBuffer->DepthStencilBuffer(), mGBuffer.get());
     }
 }
 
@@ -989,16 +997,16 @@ void SsaoApp::BuildDescriptorHeaps()
         GetDsv(1));
 
     mGBuffer->BuildDescriptors(
-        mDepthStencilBuffer.Get(),
         GetCpuSrv(mGBufferHeapIndexStart),
         GetGpuSrv(mGBufferHeapIndexStart),
         GetRtv(SwapChainBufferCount),
+        GetDsv(0),
         mCbvSrvUavDescriptorSize,
         mRtvDescriptorSize);
 
     // TODO: Don't use "magical" 2.
     mSsao->BuildDescriptors(
-        mDepthStencilBuffer.Get(),
+        mGBuffer->DepthStencilBuffer(),
         mGBuffer.get(),
         GetCpuSrv(mSsaoHeapIndexStart),
         GetGpuSrv(mSsaoHeapIndexStart),

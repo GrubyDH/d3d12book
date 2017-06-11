@@ -7,6 +7,11 @@ GBuffer::GBuffer(ID3D12Device * device, ID3D12GraphicsCommandList * cmdList, UIN
 	OnResize(width, height);
 }
 
+ID3D12Resource * GBuffer::DepthStencilBuffer()
+{
+    return mDepthStencilBuffer.Get();
+}
+
 ID3D12Resource * GBuffer::NormalMap()
 {
 	return mNormalMap.Get();
@@ -37,7 +42,7 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE GBuffer::DiffuseMapSrv() const
 	return mhDiffuseMapGpuSrv;
 }
 
-void GBuffer::BuildDescriptors(ID3D12Resource * depthStencilBuffer, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv, UINT cbvSrvUavDescriptorSize, UINT rtvDescriptorSize)
+void GBuffer::BuildDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, UINT cbvSrvUavDescriptorSize, UINT rtvDescriptorSize)
 {
 	// Save references to the descriptors.  The GBuffer reserves heap space
 	// for 3 contiguous Srvs.
@@ -53,11 +58,13 @@ void GBuffer::BuildDescriptors(ID3D12Resource * depthStencilBuffer, CD3DX12_CPU_
 	mhNormalMapCpuRtv = hCpuRtv;
 	mhDiffuseMapCpuRtv = hCpuRtv.Offset(1, rtvDescriptorSize);
 
+    mhDepthMapCpuDsv = hCpuDsv;
+
 	//  Create the descriptors
-	RebuildDescriptors(depthStencilBuffer);
+	RebuildDescriptors();
 }
 
-void GBuffer::RebuildDescriptors(ID3D12Resource * depthStencilBuffer)
+void GBuffer::RebuildDescriptors()
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = GBuffer::NormalMapFormat;
@@ -71,7 +78,7 @@ void GBuffer::RebuildDescriptors(ID3D12Resource * depthStencilBuffer)
 	md3dDevice->CreateShaderResourceView(mDiffuseMap.Get(), &srvDesc, mhDiffuseMapCpuSrv);
 
 	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-	md3dDevice->CreateShaderResourceView(depthStencilBuffer, &srvDesc, mhDepthMapCpuSrv);
+	md3dDevice->CreateShaderResourceView(mDepthStencilBuffer.Get(), &srvDesc, mhDepthMapCpuSrv);
 
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
 	rtvDesc.Format = GBuffer::NormalMapFormat;
@@ -82,6 +89,14 @@ void GBuffer::RebuildDescriptors(ID3D12Resource * depthStencilBuffer)
 
 	rtvDesc.Format = GBuffer::DiffuseMapFormat;
 	md3dDevice->CreateRenderTargetView(mDiffuseMap.Get(), &rtvDesc, mhDiffuseMapCpuRtv);
+
+    // Create descriptor to mip level 0 of entire resource using the format of the resource.
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    dsvDesc.Format = GBuffer::DepthStencilFormat;
+    dsvDesc.Texture2D.MipSlice = 0;
+    md3dDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, mhDepthMapCpuDsv);
 }
 
 void GBuffer::OnResize(UINT newWidth, UINT newHeight)
@@ -98,8 +113,9 @@ void GBuffer::OnResize(UINT newWidth, UINT newHeight)
 void GBuffer::BuildResources()
 {
 	// Release current resources.
-	mNormalMap = nullptr;
-	mDiffuseMap = nullptr;
+    mDepthStencilBuffer.Reset();
+	mNormalMap.Reset();
+	mDiffuseMap.Reset();
 
 	CD3DX12_RESOURCE_DESC texDesc = {};
 	texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -108,14 +124,35 @@ void GBuffer::BuildResources()
 	texDesc.Height = mRenderTargetHeight;
 	texDesc.DepthOrArraySize = 1;
 	texDesc.MipLevels = 1;
-	texDesc.Format = GBuffer::NormalMapFormat;
 	texDesc.SampleDesc.Count = 1;
 	texDesc.SampleDesc.Quality = 0;
 	texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
+    // We require an SRV to the depth buffer to read from the depth buffer.
+    // Therefore, because we need to create two views to the same resource:
+    //   1. SRV format: DXGI_FORMAT_R24_UNORM_X8_TYPELESS
+    //   2. DSV Format: DXGI_FORMAT_D24_UNORM_S8_UINT
+    // we need to create the depth buffer resource with a typeless format.  
+    texDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;
+
+    D3D12_CLEAR_VALUE optClear;
+    optClear.Format = GBuffer::DepthStencilFormat;
+    optClear.DepthStencil.Depth = 1.0f;
+    optClear.DepthStencil.Stencil = 0;
+    ThrowIfFailed(md3dDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &texDesc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE,
+        &optClear,
+        IID_PPV_ARGS(&mDepthStencilBuffer)));
+
+    texDesc.Format = GBuffer::NormalMapFormat;
+    texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 	float normalClearColor[] = { 0.0f, 0.0f, 1.0f, 0.0f };
-	CD3DX12_CLEAR_VALUE optClear(GBuffer::NormalMapFormat, normalClearColor);
+	optClear = CD3DX12_CLEAR_VALUE(GBuffer::NormalMapFormat, normalClearColor);
+
 	ThrowIfFailed(md3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
