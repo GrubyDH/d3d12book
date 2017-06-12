@@ -11,7 +11,9 @@ public:
 
     static const DXGI_FORMAT DepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	static const DXGI_FORMAT NormalMapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-	static const DXGI_FORMAT DiffuseMapFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+	static const DXGI_FORMAT DiffuseAlbedoFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+    static const DXGI_FORMAT BumpMapFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+    static const DXGI_FORMAT FresnelR0RoughnessFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
 
     ID3D12Resource* DepthStencilBuffer();
 	ID3D12Resource* NormalMap();
@@ -42,7 +44,9 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D12Resource> mDepthStencilBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource> mNormalMap;
-	Microsoft::WRL::ComPtr<ID3D12Resource> mDiffuseMap;
+	Microsoft::WRL::ComPtr<ID3D12Resource> mDiffuseAlbedo;
+    Microsoft::WRL::ComPtr<ID3D12Resource> mBumpMap;
+    Microsoft::WRL::ComPtr<ID3D12Resource> mFresnelR0AndRoughness;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE mhDepthMapCpuSrv;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mhDepthMapGpuSrv;
@@ -52,9 +56,17 @@ private:
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mhNormalMapGpuSrv;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE mhNormalMapCpuRtv;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE mhDiffuseMapCpuSrv;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE mhDiffuseMapGpuSrv;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE mhDiffuseMapCpuRtv;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE mhDiffuseAlbedoCpuSrv;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mhDiffuseAlbedoGpuSrv;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE mhDiffuseAlbedoCpuRtv;
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE mhBumpMapCpuSrv;
+    CD3DX12_GPU_DESCRIPTOR_HANDLE mhBumpMapGpuSrv;
+    CD3DX12_CPU_DESCRIPTOR_HANDLE mhBumpMapCpuRtv;
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE mhFresnelR0AndRoughnessCpuSrv;
+    CD3DX12_GPU_DESCRIPTOR_HANDLE mhFresnelR0AndRoughnessGpuSrv;
+    CD3DX12_CPU_DESCRIPTOR_HANDLE mhFresnelR0AndRoughnessCpuRtv;
 
 	UINT mRenderTargetWidth = 0;
 	UINT mRenderTargetHeight = 0;

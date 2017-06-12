@@ -272,9 +272,9 @@ void SsaoApp::CreateRtvAndDsvDescriptorHeaps()
 {
     // TODO: Design this better.
 
-    // Add +1 for GBuffer normal map, +1 for GBuffer diffuse map, +2 for ambient maps.
+    // Add +4 for GBuffer, +2 for ambient maps.
     D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-    rtvHeapDesc.NumDescriptors = SwapChainBufferCount + 4;
+    rtvHeapDesc.NumDescriptors = SwapChainBufferCount + 6;
     rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
     rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     rtvHeapDesc.NodeMask = 0;
@@ -918,11 +918,13 @@ void SsaoApp::BuildSsaoRootSignature()
 
 void SsaoApp::BuildDescriptorHeaps()
 {
+    // TODO: Optimize heap - remove duplicates. Good practice?
+
     //
     // Create the SRV heap.
     //
     D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-    srvHeapDesc.NumDescriptors = 19;
+    srvHeapDesc.NumDescriptors = 21;
     srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
@@ -971,7 +973,7 @@ void SsaoApp::BuildDescriptorHeaps()
     mShadowMapHeapIndex = mSkyTexHeapIndex + 1;
     mSsaoHeapIndexStart = mShadowMapHeapIndex + 1;
     mGBufferHeapIndexStart = mSsaoHeapIndexStart + 5;
-    mNullCubeSrvIndex = mGBufferHeapIndexStart + 3;
+    mNullCubeSrvIndex = mGBufferHeapIndexStart + 5;
     mNullTexSrvIndex1 = mNullCubeSrvIndex + 1;
     mNullTexSrvIndex2 = mNullTexSrvIndex1 + 1;
 

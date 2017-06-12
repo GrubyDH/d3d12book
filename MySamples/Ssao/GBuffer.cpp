@@ -19,7 +19,7 @@ ID3D12Resource * GBuffer::NormalMap()
 
 ID3D12Resource* GBuffer::DiffuseMap()
 {
-	return mDiffuseMap.Get();
+	return mDiffuseAlbedo.Get();
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE GBuffer::NormalMapRtv() const
@@ -34,12 +34,12 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE GBuffer::NormalMapSrv() const
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE GBuffer::DiffuseMapRtv() const
 {
-	return mhDiffuseMapCpuRtv;
+	return mhDiffuseAlbedoCpuRtv;
 }
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE GBuffer::DiffuseMapSrv() const
 {
-	return mhDiffuseMapGpuSrv;
+	return mhDiffuseAlbedoGpuSrv;
 }
 
 void GBuffer::BuildDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, UINT cbvSrvUavDescriptorSize, UINT rtvDescriptorSize)
@@ -49,14 +49,20 @@ void GBuffer::BuildDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GP
 
 	mhDepthMapCpuSrv = hCpuSrv;
 	mhNormalMapCpuSrv = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
-	mhDiffuseMapCpuSrv = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
+	mhDiffuseAlbedoCpuSrv = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
+    mhBumpMapCpuSrv = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
+    mhFresnelR0AndRoughnessCpuSrv = hCpuSrv.Offset(1, cbvSrvUavDescriptorSize);
 
 	mhDepthMapGpuSrv = hGpuSrv;
 	mhNormalMapGpuSrv = hGpuSrv.Offset(1, cbvSrvUavDescriptorSize);
-	mhDiffuseMapGpuSrv = hGpuSrv.Offset(1, cbvSrvUavDescriptorSize);
+	mhDiffuseAlbedoGpuSrv = hGpuSrv.Offset(1, cbvSrvUavDescriptorSize);
+    mhBumpMapGpuSrv = hGpuSrv.Offset(1, cbvSrvUavDescriptorSize);
+    mhFresnelR0AndRoughnessGpuSrv = hGpuSrv.Offset(1, cbvSrvUavDescriptorSize);
 
 	mhNormalMapCpuRtv = hCpuRtv;
-	mhDiffuseMapCpuRtv = hCpuRtv.Offset(1, rtvDescriptorSize);
+	mhDiffuseAlbedoCpuRtv = hCpuRtv.Offset(1, rtvDescriptorSize);
+    mhBumpMapCpuRtv = hCpuRtv.Offset(1, rtvDescriptorSize);
+    mhFresnelR0AndRoughnessCpuRtv = hCpuRtv.Offset(1, rtvDescriptorSize);
 
     mhDepthMapCpuDsv = hCpuDsv;
 
@@ -74,8 +80,14 @@ void GBuffer::RebuildDescriptors()
 	srvDesc.Texture2D.MipLevels = 1;
 	md3dDevice->CreateShaderResourceView(mNormalMap.Get(), &srvDesc, mhNormalMapCpuSrv);
 
-	srvDesc.Format = GBuffer::DiffuseMapFormat;
-	md3dDevice->CreateShaderResourceView(mDiffuseMap.Get(), &srvDesc, mhDiffuseMapCpuSrv);
+	srvDesc.Format = GBuffer::DiffuseAlbedoFormat;
+	md3dDevice->CreateShaderResourceView(mDiffuseAlbedo.Get(), &srvDesc, mhDiffuseAlbedoCpuSrv);
+
+    srvDesc.Format = GBuffer::BumpMapFormat;
+    md3dDevice->CreateShaderResourceView(mBumpMap.Get(), &srvDesc, mhBumpMapCpuSrv);
+
+    srvDesc.Format = GBuffer::FresnelR0RoughnessFormat;
+    md3dDevice->CreateShaderResourceView(mFresnelR0AndRoughness.Get(), &srvDesc, mhFresnelR0AndRoughnessCpuSrv);
 
 	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 	md3dDevice->CreateShaderResourceView(mDepthStencilBuffer.Get(), &srvDesc, mhDepthMapCpuSrv);
@@ -87,8 +99,14 @@ void GBuffer::RebuildDescriptors()
 	rtvDesc.Texture2D.PlaneSlice = 0;
 	md3dDevice->CreateRenderTargetView(mNormalMap.Get(), &rtvDesc, mhNormalMapCpuRtv);
 
-	rtvDesc.Format = GBuffer::DiffuseMapFormat;
-	md3dDevice->CreateRenderTargetView(mDiffuseMap.Get(), &rtvDesc, mhDiffuseMapCpuRtv);
+	rtvDesc.Format = GBuffer::DiffuseAlbedoFormat;
+	md3dDevice->CreateRenderTargetView(mDiffuseAlbedo.Get(), &rtvDesc, mhDiffuseAlbedoCpuRtv);
+
+    rtvDesc.Format = GBuffer::BumpMapFormat;
+    md3dDevice->CreateRenderTargetView(mBumpMap.Get(), &rtvDesc, mhBumpMapCpuRtv);
+
+    rtvDesc.Format = GBuffer::FresnelR0RoughnessFormat;
+    md3dDevice->CreateRenderTargetView(mFresnelR0AndRoughness.Get(), &rtvDesc, mhFresnelR0AndRoughnessCpuRtv);
 
     // Create descriptor to mip level 0 of entire resource using the format of the resource.
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
@@ -114,8 +132,10 @@ void GBuffer::BuildResources()
 {
 	// Release current resources.
     mDepthStencilBuffer.Reset();
-	mNormalMap.Reset();
-	mDiffuseMap.Reset();
+    mNormalMap.Reset();
+    mDiffuseAlbedo.Reset();
+    mBumpMap.Reset();
+    mFresnelR0AndRoughness.Reset();
 
 	CD3DX12_RESOURCE_DESC texDesc = {};
 	texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -161,15 +181,36 @@ void GBuffer::BuildResources()
 		&optClear,
 		IID_PPV_ARGS(&mNormalMap)));
 
-	texDesc.Format = GBuffer::DiffuseMapFormat;
+	texDesc.Format = GBuffer::DiffuseAlbedoFormat;
 	float diffuseClearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	optClear = CD3DX12_CLEAR_VALUE(GBuffer::DiffuseMapFormat, diffuseClearColor);
-
+	optClear = CD3DX12_CLEAR_VALUE(GBuffer::DiffuseAlbedoFormat, diffuseClearColor);
 	ThrowIfFailed(md3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&texDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		&optClear,
-		IID_PPV_ARGS(&mDiffuseMap)));
+		IID_PPV_ARGS(&mDiffuseAlbedo)));
+
+    texDesc.Format = GBuffer::BumpMapFormat;
+    float bumpClearColor[] = { 0.0f, 0.0f, 1.0f, 0.0f };
+    optClear = CD3DX12_CLEAR_VALUE(GBuffer::BumpMapFormat, bumpClearColor);
+    ThrowIfFailed(md3dDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &texDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        &optClear,
+        IID_PPV_ARGS(&mBumpMap)));
+
+    texDesc.Format = GBuffer::FresnelR0RoughnessFormat;
+    float fresnelClearColor[] = { 0.01f, 0.01f, 0.01f, 0.5f };
+    optClear = CD3DX12_CLEAR_VALUE(GBuffer::FresnelR0RoughnessFormat, fresnelClearColor);
+    ThrowIfFailed(md3dDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &texDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&mFresnelR0AndRoughness)));
 }
