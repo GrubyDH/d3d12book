@@ -16,13 +16,20 @@ public:
     static const DXGI_FORMAT FresnelR0RoughnessFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
 
     ID3D12Resource* DepthStencilBuffer();
-	ID3D12Resource* NormalMap();
-	ID3D12Resource* DiffuseMap();
+    ID3D12Resource* NormalMap();
+    ID3D12Resource* DiffuseAlbedo();
+    ID3D12Resource* BumpMap();
+    ID3D12Resource* FresnelR0Roughness();
 
+    CD3DX12_CPU_DESCRIPTOR_HANDLE DepthStencilView() const;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE NormalMapRtv() const;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE NormalMapSrv() const;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE DiffuseMapRtv() const;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE DiffuseMapSrv() const;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DiffuseAlbedoRtv() const;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DiffuseAlbedoSrv() const;
+    CD3DX12_CPU_DESCRIPTOR_HANDLE BumpMapRtv() const;
+    CD3DX12_GPU_DESCRIPTOR_HANDLE BumpMapSrv() const;
+    CD3DX12_CPU_DESCRIPTOR_HANDLE FresnelR0RoughnessRtv() const;
+    CD3DX12_GPU_DESCRIPTOR_HANDLE FresnelR0RoughnessSrv() const;
 
 	void BuildDescriptors(
 		CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv,

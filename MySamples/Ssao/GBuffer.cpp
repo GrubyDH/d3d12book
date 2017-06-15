@@ -17,9 +17,24 @@ ID3D12Resource * GBuffer::NormalMap()
 	return mNormalMap.Get();
 }
 
-ID3D12Resource* GBuffer::DiffuseMap()
+ID3D12Resource* GBuffer::DiffuseAlbedo()
 {
 	return mDiffuseAlbedo.Get();
+}
+
+ID3D12Resource * GBuffer::BumpMap()
+{
+    return mBumpMap.Get();
+}
+
+ID3D12Resource * GBuffer::FresnelR0Roughness()
+{
+    return mFresnelR0AndRoughness.Get();
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE GBuffer::DepthStencilView() const
+{
+    return mhDepthMapCpuDsv;
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE GBuffer::NormalMapRtv() const
@@ -32,14 +47,34 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE GBuffer::NormalMapSrv() const
 	return mhNormalMapGpuSrv;
 }
 
-CD3DX12_CPU_DESCRIPTOR_HANDLE GBuffer::DiffuseMapRtv() const
+CD3DX12_CPU_DESCRIPTOR_HANDLE GBuffer::DiffuseAlbedoRtv() const
 {
 	return mhDiffuseAlbedoCpuRtv;
 }
 
-CD3DX12_GPU_DESCRIPTOR_HANDLE GBuffer::DiffuseMapSrv() const
+CD3DX12_GPU_DESCRIPTOR_HANDLE GBuffer::DiffuseAlbedoSrv() const
 {
 	return mhDiffuseAlbedoGpuSrv;
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE GBuffer::BumpMapRtv() const
+{
+    return mhBumpMapCpuRtv;
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE GBuffer::BumpMapSrv() const
+{
+    return mhBumpMapGpuSrv;
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE GBuffer::FresnelR0RoughnessRtv() const
+{
+    return mhFresnelR0AndRoughnessCpuRtv;
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE GBuffer::FresnelR0RoughnessSrv() const
+{
+    return mhFresnelR0AndRoughnessGpuSrv;
 }
 
 void GBuffer::BuildDescriptors(CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv, CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuRtv, CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDsv, UINT cbvSrvUavDescriptorSize, UINT rtvDescriptorSize)
