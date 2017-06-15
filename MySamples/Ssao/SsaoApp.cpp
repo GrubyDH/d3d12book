@@ -1012,7 +1012,7 @@ void SsaoApp::BuildDescriptorHeaps()
         mGBuffer.get(),
         GetCpuSrv(mSsaoHeapIndexStart),
         GetGpuSrv(mSsaoHeapIndexStart),
-        GetRtv(SwapChainBufferCount + 2),
+        GetRtv(SwapChainBufferCount + 4),
         mCbvSrvUavDescriptorSize,
         mRtvDescriptorSize);
 }
