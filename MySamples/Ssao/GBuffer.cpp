@@ -246,6 +246,6 @@ void GBuffer::BuildResources()
         D3D12_HEAP_FLAG_NONE,
         &texDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
+        &optClear,
         IID_PPV_ARGS(&mFresnelR0AndRoughness)));
 }
