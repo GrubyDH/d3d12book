@@ -104,7 +104,7 @@ private:
     void BuildRenderItems();
     void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
     void DrawSceneToShadowMap();
-    void DrawNormalsAndDepth();
+    void DrawGBuffer();
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE GetCpuSrv(int index)const;
     CD3DX12_GPU_DESCRIPTOR_HANDLE GetGpuSrv(int index)const;
@@ -397,10 +397,10 @@ void SsaoApp::Draw(const GameTimer& gt)
     DrawSceneToShadowMap();
 
     //
-    // Normal/depth pass.
+    // GBuffer pass.
     //
 
-    DrawNormalsAndDepth();
+    DrawGBuffer();
 
     //
     // Compute SSAO.
@@ -437,7 +437,7 @@ void SsaoApp::Draw(const GameTimer& gt)
     // SO DO NOT CLEAR DEPTH.
 
     // Specify the buffers we are going to render to.
-    mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
+    mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &mGBuffer->DepthStencilView());
 
     // Bind all the textures used in this scene. Observe
     // that we only have to specify the first descriptor in the table.  
@@ -1772,25 +1772,49 @@ void SsaoApp::DrawSceneToShadowMap()
         D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
-void SsaoApp::DrawNormalsAndDepth()
+void SsaoApp::DrawGBuffer()
 {
     mCommandList->RSSetViewports(1, &mScreenViewport);
     mCommandList->RSSetScissorRects(1, &mScissorRect);
 
+    auto dsv = mGBuffer->DepthStencilView();
     auto normalMap = mGBuffer->NormalMap();
+    auto diffuseAlbedo = mGBuffer->DiffuseAlbedo();
+    auto bumpMap = mGBuffer->BumpMap();
+    auto fresnelR0Roughness = mGBuffer->FresnelR0Roughness();
+
     auto normalMapRtv = mGBuffer->NormalMapRtv();
+    auto diffuseAlbedoRtv = mGBuffer->DiffuseAlbedoRtv();
+    auto bumpMapRtv = mGBuffer->BumpMapRtv();
+    auto fresnelR0RoughnessRtv = mGBuffer->FresnelR0RoughnessRtv();
 
     // Change to RENDER_TARGET.
-    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(normalMap,
-        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    D3D12_RESOURCE_BARRIER barriersReadToRt[] = {
+        CD3DX12_RESOURCE_BARRIER::Transition(normalMap,
+        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET),
+        CD3DX12_RESOURCE_BARRIER::Transition(diffuseAlbedo,
+        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET),
+        CD3DX12_RESOURCE_BARRIER::Transition(bumpMap,
+        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET),
+        CD3DX12_RESOURCE_BARRIER::Transition(fresnelR0Roughness,
+        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET)
+    };
+    mCommandList->ResourceBarrier(4, barriersReadToRt);
 
     // Clear the screen normal map and depth buffer.
-    float clearValue[] = { 0.0f, 0.0f, 1.0f, 0.0f };
-    mCommandList->ClearRenderTargetView(normalMapRtv, clearValue, 0, nullptr);
-    mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+    float normalCV[] = { 0.0f, 0.0f, 1.0f, 0.0f };
+    mCommandList->ClearRenderTargetView(normalMapRtv, normalCV, 0, nullptr);
+    float diffuseCV[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    mCommandList->ClearRenderTargetView(diffuseAlbedoRtv, diffuseCV, 0, nullptr);
+    float bumpCV[] = { 0.0f, 0.0f, 1.0f, 0.0f };
+    mCommandList->ClearRenderTargetView(bumpMapRtv, bumpCV, 0, nullptr);
+    float fresnelCV[] = { 0.01f, 0.01f, 0.01f, 0.5f };
+    mCommandList->ClearRenderTargetView(fresnelR0RoughnessRtv, fresnelCV, 0, nullptr);
+
+    mCommandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
     // Specify the buffers we are going to render to.
-    mCommandList->OMSetRenderTargets(1, &normalMapRtv, true, &DepthStencilView());
+    mCommandList->OMSetRenderTargets(4, &normalMapRtv, true, &dsv);
 
     // Bind the constant buffer for this pass.
     auto passCB = mCurrFrameResource->PassCB->Resource();
@@ -1801,8 +1825,17 @@ void SsaoApp::DrawNormalsAndDepth()
     DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Opaque]);
 
     // Change back to GENERIC_READ so we can read the texture in a shader.
-    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(normalMap,
-        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+    D3D12_RESOURCE_BARRIER barriersRtToRead[] = {
+        CD3DX12_RESOURCE_BARRIER::Transition(normalMap,
+        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ),
+        CD3DX12_RESOURCE_BARRIER::Transition(diffuseAlbedo,
+        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ),
+        CD3DX12_RESOURCE_BARRIER::Transition(bumpMap,
+        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ),
+        CD3DX12_RESOURCE_BARRIER::Transition(fresnelR0Roughness,
+        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ)
+    };
+    mCommandList->ResourceBarrier(4, barriersRtToRead);
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE SsaoApp::GetCpuSrv(int index)const
