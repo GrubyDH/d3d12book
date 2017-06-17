@@ -127,5 +127,8 @@
     <None Include="Shaders\SsaoDebug.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shaders\DrawGBuffer.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -1041,6 +1041,9 @@ void SsaoApp::BuildShadersAndInputLayout()
     mShaders["drawNormalsVS"] = d3dUtil::CompileShader(L"Shaders\\DrawNormals.hlsl", nullptr, "VS", "vs_5_1");
     mShaders["drawNormalsPS"] = d3dUtil::CompileShader(L"Shaders\\DrawNormals.hlsl", nullptr, "PS", "ps_5_1");
 
+    mShaders["drawGBufferVS"] = d3dUtil::CompileShader(L"Shaders\\DrawGBuffer.hlsl", nullptr, "VS", "vs_5_1");
+    mShaders["drawGBufferPS"] = d3dUtil::CompileShader(L"Shaders\\DrawGBuffer.hlsl", nullptr, "PS", "ps_5_1");
+
     mShaders["ssaoVS"] = d3dUtil::CompileShader(L"Shaders\\Ssao.hlsl", nullptr, "VS", "vs_5_1");
     mShaders["ssaoPS"] = d3dUtil::CompileShader(L"Shaders\\Ssao.hlsl", nullptr, "PS", "ps_5_1");
 
@@ -1434,6 +1437,26 @@ void SsaoApp::BuildPSOs()
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&drawNormalsPsoDesc, IID_PPV_ARGS(&mPSOs["drawNormals"])));
 
     //
+    // PSO for drawing to GBuffer.
+    //
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC drawGBufferPsoDesc = basePsoDesc;
+    drawGBufferPsoDesc.VS = {
+        reinterpret_cast<BYTE*>(mShaders["drawGBufferVS"]->GetBufferPointer()),
+        mShaders["drawGBufferVS"]->GetBufferSize()
+    };
+    drawGBufferPsoDesc.PS = {
+        reinterpret_cast<BYTE*>(mShaders["drawGBufferPS"]->GetBufferPointer()),
+        mShaders["drawGBufferPS"]->GetBufferSize()
+    };
+    drawGBufferPsoDesc.NumRenderTargets = 4;
+    drawGBufferPsoDesc.RTVFormats[0] = GBuffer::NormalMapFormat;
+    drawGBufferPsoDesc.RTVFormats[1] = GBuffer::DiffuseAlbedoFormat;
+    drawGBufferPsoDesc.RTVFormats[2] = GBuffer::BumpMapFormat;
+    drawGBufferPsoDesc.RTVFormats[3] = GBuffer::FresnelR0RoughnessFormat;
+    drawGBufferPsoDesc.DSVFormat = GBuffer::DepthStencilFormat;
+    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&drawGBufferPsoDesc, IID_PPV_ARGS(&mPSOs["drawGBuffer"])));
+
+    //
     // PSO for SSAO.
     //
     D3D12_GRAPHICS_PIPELINE_STATE_DESC ssaoPsoDesc = basePsoDesc;
@@ -1820,7 +1843,7 @@ void SsaoApp::DrawGBuffer()
     auto passCB = mCurrFrameResource->PassCB->Resource();
     mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
-    mCommandList->SetPipelineState(mPSOs["drawNormals"].Get());
+    mCommandList->SetPipelineState(mPSOs["drawGBuffer"].Get());
 
     DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Opaque]);
 
